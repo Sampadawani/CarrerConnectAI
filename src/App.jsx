@@ -6,6 +6,7 @@ import {
   Sparkles, Target, TrendingUp, Users, X, Zap,
 } from "lucide-react";
 import { api, clearSession, saveSession } from "./api.js";
+import TurnstileWidget from "./TurnstileWidget.jsx";
 const Workspace = lazy(() => import("./Workspace.jsx"));
 
 const SessionContext = createContext(null);
@@ -55,7 +56,6 @@ function App() {
               <Route path="/profile" element={<Protected><ProfilePage /></Protected>} />
               <Route path="/workspace/:page" element={<Protected><WorkspacePage /></Protected>} />
               <Route path="/workspace/applicant/:id" element={<Protected><ApplicantPage /></Protected>} />
-              <Route path="/verify-email" element={<AuthAction action="verify" />} />
               <Route path="/forgot-password" element={<AuthAction action="forgot" />} />
               <Route path="/reset-password" element={<AuthAction action="reset" />} />
               <Route path="/about" element={<InfoPage page="about" />} />
@@ -245,7 +245,7 @@ function Home() {
       </section>
       <section className="section faq-section">
         <div className="principle-heading"><div className="eyebrow eyebrow-muted">GOOD TO KNOW</div><h2>A few honest <span>answers.</span></h2></div>
-        <div className="faq-list"><details><summary>Does the resume analyzer use AI?</summary><p>No. It extracts text from PDFs, checks for common resume sections, and compares words against listed skills. It does not use a language model or semantic NLP.</p></details><details><summary>Who can see my resume?</summary><p>Your PDF is stored privately. Only you, platform administrators, and recruiters whose roles you applied to can download it when your profile visibility setting allows access.</p></details><details><summary>How are job matches calculated?</summary><p>Recommendations compare your saved skills, location, work-style and career-interest preferences with active job postings. Each result includes reasons and missing skills; scores are a transparent heuristic, not a prediction.</p></details><details><summary>Can I use the site without email delivery?</summary><p>In local development, registration and password recovery show a time-limited verification or reset token for testing. Production deployments should configure SMTP in the server environment.</p></details></div>
+        <div className="faq-list"><details><summary>Does the resume analyzer use AI?</summary><p>No. It extracts text from PDFs, checks for common resume sections, and compares words against listed skills. It does not use a language model or semantic NLP.</p></details><details><summary>Who can see my resume?</summary><p>Your PDF is stored privately. Only you, platform administrators, and recruiters whose roles you applied to can download it when your profile visibility setting allows access.</p></details><details><summary>How are job matches calculated?</summary><p>Recommendations compare your saved skills, location, work-style and career-interest preferences with active job postings. Each result includes reasons and missing skills; scores are a transparent heuristic, not a prediction.</p></details><details><summary>Can I use the site without email delivery?</summary><p>Registration does not require email verification. If email delivery is not configured in local development, password recovery shows a time-limited reset token for testing. Production deployments should configure Gmail credentials on the server.</p></details></div>
       </section>
       <section className="trust-line"><ShieldCheck size={18} /><span>Your information stays yours. We keep your profile private and your job search on your terms.</span><Link to="/register">Learn more <ArrowRight size={14} /></Link></section>
     </>
@@ -362,32 +362,37 @@ function JobDetail() {
 }
 
 function AuthPage({ register = false }) {
-  const { user, signIn } = useSession();
+  const { user, signIn, theme } = useSession();
   const navigate = useNavigate();
   const [role, setRole] = useState("candidate");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
-  const [verificationPending, setVerificationPending] = useState(false);
-  const [verificationToken, setVerificationToken] = useState("");
+  const [captchaToken, setCaptchaToken] = useState("");
+  const [captchaReset, setCaptchaReset] = useState(0);
   const [form, setForm] = useState({ name: "", email: "", password: "", company: "" });
   if (user) return <Navigate to="/dashboard" replace />;
   const change = (event) => setForm({ ...form, [event.target.name]: event.target.value });
   const submit = async (event) => {
     event.preventDefault();
     setError("");
+    if (!captchaToken) {
+      setError("Complete the CAPTCHA challenge before continuing.");
+      return;
+    }
     setBusy(true);
     try {
       const path = register ? "/auth/register" : "/auth/login";
-      const body = register ? { ...form, role } : { email: form.email, password: form.password };
+      const body = register
+        ? { ...form, role, captchaToken }
+        : { email: form.email, password: form.password, captchaToken };
       const session = await api(path, { method: "POST", body });
-      if (session.token) {
-        signIn(session);
-        navigate("/dashboard");
-      } else {
-        setVerificationPending(true);
-        setVerificationToken(session.developmentVerificationToken || "");
-      }
-    } catch (failure) { setError(failure.message); }
+      signIn(session);
+      navigate("/dashboard");
+    } catch (failure) {
+      setError(failure.message);
+      setCaptchaToken("");
+      setCaptchaReset((current) => current + 1);
+    }
     finally { setBusy(false); }
   };
   return (
@@ -400,20 +405,12 @@ function AuthPage({ register = false }) {
           <label>Email address<input name="email" type="email" value={form.email} onChange={change} placeholder="you@example.com" autoComplete="email" required /></label>
           {register && role === "recruiter" && <label>Company name<input name="company" value={form.company} onChange={change} placeholder="Where do you work?" required maxLength={120} /></label>}
           <label>Password<input name="password" type="password" value={form.password} onChange={change} placeholder={register ? "At least 8 characters" : "Your password"} autoComplete={register ? "new-password" : "current-password"} minLength={register ? 8 : undefined} required /></label>
+          <TurnstileWidget key={captchaReset} action={register ? "register" : "login"} theme={theme} onToken={setCaptchaToken} />
           {error && <div className="form-error" role="alert">{error}</div>}
-          {verificationPending && <div className="form-success" role="status">Your account is ready. Verify your email before signing in.{verificationToken && <Link to={`/verify-email?token=${verificationToken}`}>Verify this development email</Link>}<ResendVerification /></div>}
-          <button className="button button-dark button-full auth-submit" disabled={busy || verificationPending}>{busy ? "One moment…" : verificationPending ? "Account created" : register ? "Create your account" : "Log in"} <ArrowRight size={16} /></button>
+          <button className="button button-dark button-full auth-submit" disabled={busy || !captchaToken}>{busy ? "One moment…" : register ? "Create your account" : "Log in"} <ArrowRight size={16} /></button>
           <div className="auth-privacy"><ShieldCheck size={15} />Your information stays private and secure.</div>
         </form>
-        
-        {!register && (
-          <>
-            <ResendVerification />
-            <Link className="auth-forgot-link" to="/forgot-password">
-              Forgot your password?
-            </Link>
-          </>
-        )}
+        {!register && <Link className="auth-forgot-link" to="/forgot-password">Forgot your password?</Link>}
         <div className="auth-switch">
           {register ? "Already have an account?" : "New to CareerConnect?"}{" "}
           <Link to={register ? "/login" : "/register"}>
@@ -573,7 +570,6 @@ function ProfileCollection({ title, items, fields, onAdd, onChange, onRemove }) 
 
 function AuthAction({ action }) {
   const [params] = useSearchParams();
-  const { signIn } = useSession();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [message, setMessage] = useState("");
@@ -581,15 +577,6 @@ function AuthAction({ action }) {
   const [developmentResetToken, setDevelopmentResetToken] = useState("");
   const [busy, setBusy] = useState(false);
   const navigate = useNavigate();
-  useEffect(() => {
-    if (action !== "verify" || !token) return;
-    let active = true;
-    api("/auth/verify-email", { method: "POST", body: { token } }).then((session) => {
-      if (!active) return;
-      signIn(session); setMessage("Email verified. You’re signed in."); window.setTimeout(() => navigate("/dashboard"), 1200);
-    }).catch((failure) => { if (active) setMessage(failure.message); });
-    return () => { active = false; };
-  }, [action, token, signIn, navigate]);
   const submit = async (event) => {
     event.preventDefault(); setBusy(true); setMessage("");
     try {
@@ -604,22 +591,7 @@ function AuthAction({ action }) {
     } catch (failure) { setMessage(failure.message); }
     finally { setBusy(false); }
   };
-  if (action === "verify") return <section className="section auth-action"><div className="auth-action-card"><ShieldCheck size={27} /><h1>Verify your email</h1><p role="status">{message || (token ? "Checking your verification link…" : "Open the verification link sent to your email address.")}</p>{!token && <ResendVerification />}</div></section>;
   return <section className="auth-action"><div className="auth-action-card"><LockKeyhole size={27} /><h1>{action === "forgot" ? "Reset your password" : "Choose a new password"}</h1><p>{action === "forgot" ? "We’ll send a time-limited password reset link if the account exists." : "Use the secure link from your email to choose a new password."}</p><form className="auth-form" onSubmit={submit}>{action === "forgot" ? <label>Email address<input type="email" required value={email} onChange={(event) => setEmail(event.target.value)} /></label> : <><label>Reset token<input required value={token} onChange={(event) => setToken(event.target.value)} minLength="64" maxLength="64" /></label><label>New password<input type="password" required minLength="8" maxLength="128" value={password} onChange={(event) => setPassword(event.target.value)} /></label></>}{message && <p className="auth-action-message" role="status">{message}</p>}{developmentResetToken && <Link className="auth-development-link" to={`/reset-password?token=${developmentResetToken}`}>Open development reset link</Link>}<button className="button button-primary button-full" disabled={busy}>{busy ? "Please wait…" : action === "forgot" ? "Send reset link" : "Save new password"} <ArrowRight size={14} /></button></form></div></section>;
-}
-
-function ResendVerification() {
-  const [email, setEmail] = useState("");
-  const [message, setMessage] = useState("");
-  const [developmentToken, setDevelopmentToken] = useState("");
-  const [busy, setBusy] = useState(false);
-  const send = async () => {
-    setBusy(true); setDevelopmentToken("");
-    try { const result = await api("/auth/resend-verification", { method: "POST", body: { email } }); setMessage(result.message); setDevelopmentToken(result.developmentVerificationToken || ""); }
-    catch (failure) { setMessage(failure.message); }
-    finally { setBusy(false); }
-  };
-  return <div className="resend-verification"><label>Email address<input type="email" required value={email} onChange={(event) => setEmail(event.target.value)} /></label><button type="button" className="button button-outline" disabled={busy || !email} onClick={send}>{busy ? "Sending…" : "Resend verification link"}</button>{message && <p role="status">{message}</p>}{developmentToken && <Link to={`/verify-email?token=${developmentToken}`}>Open development verification link</Link>}</div>;
 }
 
 function InfoPage({ page }) {

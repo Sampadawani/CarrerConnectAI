@@ -32,7 +32,7 @@ router.get("/users", async (req, res, next) => {
   try {
     const filter = {};
     if (["candidate", "recruiter", "admin"].includes(req.query.role)) filter.role = req.query.role;
-    const users = await User.find(filter).select("name email role company accountActive emailVerified recruiterVerified createdAt").sort({ createdAt: -1 }).limit(500);
+    const users = await User.find(filter).select("name email role company accountActive recruiterVerified createdAt").sort({ createdAt: -1 }).limit(500);
     res.json({ users });
   } catch (error) { next(error); }
 });

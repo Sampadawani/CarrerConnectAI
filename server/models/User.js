@@ -25,10 +25,7 @@ const userSchema = new mongoose.Schema(
     salaryMaximum: { type: Number, min: 0, default: null },
     profileVisible: { type: Boolean, default: true },
     accountActive: { type: Boolean, default: true },
-    emailVerified: { type: Boolean, default: false },
     recruiterVerified: { type: Boolean, default: false },
-    verificationTokenHash: { type: String, select: false },
-    verificationExpires: { type: Date, select: false },
     resetTokenHash: { type: String, select: false },
     resetExpires: { type: Date, select: false },
     notificationPreferences: {

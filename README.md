@@ -16,7 +16,7 @@ A full-stack career and recruitment platform for candidates, recruiters and admi
    notepad .env
    ```
 
-2. Set `MONGODB_URI` to your MongoDB connection string and replace `JWT_SECRET` with a long, random secret. The example uses a local database at `mongodb://127.0.0.1:27017/careerconnect`.
+2. Set `MONGODB_URI` to your MongoDB connection string and replace `JWT_SECRET` with a long, random secret. Create a Cloudflare Turnstile widget for `localhost`, then set its site key in `VITE_TURNSTILE_SITE_KEY` and its secret key in `TURNSTILE_SECRET_KEY`. The example uses a local database at `mongodb://127.0.0.1:27017/careerconnect`.
 3. Install dependencies and start both the API and frontend:
 
    ```powershell
@@ -26,11 +26,13 @@ A full-stack career and recruitment platform for candidates, recruiters and admi
 
 4. Open [http://localhost:5173](http://localhost:5173). The API runs on port 5000 and Vite proxies `/api` requests to it.
 
+Registration and login require a working CAPTCHA configuration. The site key is public; never put the Turnstile secret in a `VITE_` variable or frontend deployment. Email verification is not required.
+
 The API starts when MongoDB is unavailable, but database-backed features return an explicit error until a database is configured and connected. Check `http://localhost:5000/api/health` for the API and database connection status.
 
-## Optional email delivery
+## Password recovery email
 
-Email verification and password recovery work without an SMTP provider during local development: the app shows a time-limited development token/link that can be used to verify an account or reset its password. For actual email delivery, set `SMTP_HOST`, `SMTP_PORT`, `SMTP_SECURE`, `SMTP_USER`, `SMTP_PASS` and `EMAIL_FROM` in `.env`. Never use development tokens or demo accounts in a production deployment.
+Password reset links are shown in the response during local development if email delivery is not configured. For actual email delivery, set `GMAIL_USER` and a Google app password in `GMAIL_APP_PASSWORD`. Do not use development reset tokens or demo accounts in a production deployment.
 
 ## Sample data (development only)
 
@@ -50,7 +52,7 @@ The seeded credentials are public and intended only for local testing. Do not se
 
 ## Implemented workflows
 
-- Email verification, login, password recovery, account deactivation and role-based candidate, recruiter and admin access.
+- Cloudflare Turnstile-protected registration and login, password recovery, account deactivation and role-based candidate, recruiter and admin access.
 - Public job search, category/location/work-style/type filters, sorting and pagination; recruiter job posting and management.
 - Candidate profiles, saved jobs, applications, application status history and recruiter applicant review.
 - Private PDF resume upload, basic text/section checks and explainable keyword overlap; profile-based PDF resume creation.
@@ -64,10 +66,20 @@ Resume review and job recommendations are transparent, rules-based heuristics. T
 
 - `npm.cmd run dev` — run the API and Vite development server
 - `npm.cmd run build` — build the production frontend into `dist`
+- `npm.cmd test` — run Turnstile verification and middleware tests
 - `npm.cmd start` — start Express and serve `dist` when it exists
 - `npm.cmd run seed` — insert local-development sample data
 
-For a production-style local run, set secure production environment values, configure SMTP, then run `npm.cmd run build` followed by `npm.cmd start`.
+For a production-style local run, set secure production environment values and configure Gmail credentials if password-reset email delivery is needed, then run `npm.cmd run build` followed by `npm.cmd start`.
+
+## Cloudflare, Render and Vercel deployment
+
+1. In Cloudflare, create a Turnstile widget. Add `localhost` for local development and the production Vercel hostname (for example, `your-app.vercel.app`) to the widget's allowed hostnames. Copy the widget's **site key** and **secret key**.
+2. In Vercel, configure `VITE_TURNSTILE_SITE_KEY` with the site key and `VITE_API_URL` with the Render service's HTTPS origin, without a trailing slash or `/api` (for example, `https://your-api.onrender.com`). Set these for the production environment and redeploy after changing them.
+3. In Render, deploy the repository as a Node web service using `npm install` as the build command and `npm start` as the start command. Set `MONGODB_URI`, a strong random `JWT_SECRET`, `TURNSTILE_SECRET_KEY` (the Cloudflare secret), `CLIENT_ORIGIN` (the exact Vercel production origin, including `https://`), and `NODE_ENV=production`. Render provides `PORT`. Add `GMAIL_USER` and `GMAIL_APP_PASSWORD` if password-reset email delivery is needed.
+4. Allow the Render service to connect to the MongoDB Atlas cluster using Atlas network access settings. Check the Render `/api/health` endpoint after deployment.
+
+The Turnstile secret and database/JWT/email credentials belong only in Render's server-side environment. Never add them to Vercel `VITE_` variables, source files, or `.env.example`. The Vercel configuration includes SPA routing and a Content Security Policy that permits Turnstile; the Render API also allows the Turnstile script, frame, and verification connections. Vercel preview URLs need to be added to `CLIENT_ORIGIN`/Turnstile allowed hostnames if you want to test authentication on previews.
 
 ## Environment and data storage
 

@@ -28,7 +28,16 @@ const app = express();
 app.set("trust proxy", 1);
 const port = Number(process.env.PORT) || 5000;
 
-app.use(helmet());
+app.use(helmet({
+  contentSecurityPolicy: {
+    directives: {
+      ...helmet.contentSecurityPolicy.getDefaultDirectives(),
+      "script-src": ["'self'", "https://challenges.cloudflare.com"],
+      "frame-src": ["'self'", "https://challenges.cloudflare.com"],
+      "connect-src": ["'self'", "https://challenges.cloudflare.com", "https:"],
+    },
+  },
+}));
 app.use(cors({ origin: process.env.CLIENT_ORIGIN || "http://localhost:5173" }));
 app.use(express.json({ limit: "1mb" }));
 app.use((req, res, next) => {

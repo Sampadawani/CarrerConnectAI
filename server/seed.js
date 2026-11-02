@@ -18,7 +18,6 @@ for (const account of accounts) {
   if (!user) {
     user = await User.create({
       ...account,
-      emailVerified: true,
       password: await bcrypt.hash(account.password, 12),
     });
   }

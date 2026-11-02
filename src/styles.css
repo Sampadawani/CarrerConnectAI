@@ -417,11 +417,10 @@ main { flex: 1; }
 .job-pagination .button:disabled { cursor: not-allowed; }
 .form-success { display: flex; flex-direction: column; gap: 8px; padding: 11px; border: 1px solid #cce8d7; border-radius: 7px; color: #38745b; background: #f3fbf6; font-size: 12px; line-height: 1.6; }
 .form-success > a { color: #5d48be; text-decoration: underline; font-weight: 700; }
-.resend-verification { display: grid; gap: 9px; }
-.resend-verification label { display: flex; flex-direction: column; gap: 7px; color: #606b7d; font-size: 12px; font-weight: 700; }
-.resend-verification input { min-height: 39px; padding: 10px 11px; border: 1px solid #e6e7ec; border-radius: 6px; color: #29344a; background: #fff; font-size: 13px; }
-.resend-verification p { margin: 0; color: #737e90; font-size: 12px; line-height: 1.6; }
-.resend-verification > a, .auth-development-link { color: #6048be; font-size: 12px; font-weight: 700; text-decoration: underline; }
+.turnstile-field { display: flex; flex-direction: column; align-items: flex-start; gap: 7px; min-width: 0; max-width: 100%; }
+.turnstile-widget { width: 100%; max-width: 300px; min-height: 65px; }
+.turnstile-error { margin: 0; color: #a63e4e; font-size: 12px; line-height: 1.5; }
+.auth-development-link { color: #6048be; font-size: 12px; font-weight: 700; text-decoration: underline; }
 .workspace-loading { min-height: 45vh; display: grid; place-items: center; color: #7d8798; font-size: 14px; }
 
 html[data-theme="dark"] { color-scheme: dark; --ink: #e6e9f2; --muted: #a0a9ba; --navy: #edf0f7; --line: #33394a; }
@@ -434,7 +433,6 @@ html[data-theme="dark"] input, html[data-theme="dark"] textarea, html[data-theme
 html[data-theme="dark"] .job-category-filters button.category-filter-active { color: #c2b6ff; background: #302a4b; }
 html[data-theme="dark"] .search-input-wrap input, html[data-theme="dark"] .toolbar-search input { color: #e2e6ef; }
 html[data-theme="dark"] .faq-list, html[data-theme="dark"] .faq-list details, html[data-theme="dark"] .job-category-filters button { border-color: #33394a; }
-html[data-theme="dark"] .resend-verification input { color: #e2e6ef; border-color: #41475a; background: #202537; }
 
 @media (min-width: 1440px) {
   .hero-section, .section, .nav-wrap { max-width: 1300px; }
@@ -1013,7 +1011,6 @@ html[data-theme="dark"] .workspace-form-grid input,
 html[data-theme="dark"] .workspace-form-grid textarea,
 html[data-theme="dark"] .workspace-form-grid select,
 html[data-theme="dark"] .status-select,
-html[data-theme="dark"] .resend-verification input,
 html[data-theme="dark"] .resume-analyze-row select,
 html[data-theme="dark"] .roadmap-create > select,
 html[data-theme="dark"] .roadmap-create > input,
@@ -1144,7 +1141,7 @@ html[data-theme="dark"] .trust-line { color: var(--dark-muted); }
 html[data-theme="dark"] .auth-privacy,
 html[data-theme="dark"] .auth-switch,
 html[data-theme="dark"] .auth-action-card > p { color: var(--dark-muted); }
-html[data-theme="dark"] .resend-verification label { color: var(--dark-text); }
+html[data-theme="dark"] .turnstile-error { color: #ffb6bf; }
 html[data-theme="dark"] .recharts-cartesian-grid line { stroke: var(--dark-border); }
 html[data-theme="dark"] .auth-form label,
 html[data-theme="dark"] .profile-form-fields > label,

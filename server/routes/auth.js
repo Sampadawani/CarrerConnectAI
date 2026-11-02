@@ -6,6 +6,7 @@ import { createHash, randomBytes } from "node:crypto";
 import rateLimit from "express-rate-limit";
 import User from "../models/User.js";
 import { authenticate } from "../middleware/auth.js";
+import { requireTurnstile } from "../middleware/turnstile.js";
 import { sendAccountEmail } from "../services/email.js";
 
 const router = Router();
@@ -55,7 +56,6 @@ export const publicUser = (user) => ({
   salaryMinimum: user.salaryMinimum,
   salaryMaximum: user.salaryMaximum,
   profileVisible: user.profileVisible,
-  emailVerified: user.emailVerified,
   recruiterVerified: user.recruiterVerified,
   links: user.links,
   notificationPreferences: user.notificationPreferences,
@@ -71,7 +71,7 @@ const sessionFor = (user) => ({
 });
 
 // REGISTER
-router.post("/register", sensitiveLimit, async (req, res, next) => {
+router.post("/register", sensitiveLimit, requireTurnstile("register"), async (req, res, next) => {
   try {
     const {
       name,
@@ -129,144 +129,14 @@ router.post("/register", sensitiveLimit, async (req, res, next) => {
       company: company.trim(),
     });
 
-    const verificationToken = randomBytes(32).toString("hex");
-
-    user.verificationTokenHash = hashToken(verificationToken);
-    user.verificationExpires = new Date(
-      Date.now() + 24 * 60 * 60 * 1000
-    );
-
-    await user.save();
-
-    console.log("[EMAIL DEBUG] Registration email requested.");
-
-    const sent = await sendAccountEmail(
-      user.email,
-      "Verify your CareerConnect account",
-      `Verify your account: ${clientOrigin()}/verify-email?token=${verificationToken}`
-    );
-
-    console.log("[EMAIL DEBUG] Registration email result:", sent);
-
-    if (sent) {
-      return res.status(201).json({
-        message: "Account created. Check your email to verify it before signing in.",
-      });
-    }
-
-    if (process.env.NODE_ENV === "production") {
-      return res.status(503).json({
-        message: "Account created, but email delivery failed. Please request a new verification link.",
-      });
-    }
-
-    res.status(201).json({
-      message: "Account created. Verify your email before signing in.",
-      developmentVerificationToken: verificationToken,
-    });
+    res.status(201).json(sessionFor(user));
   } catch (error) {
-    console.error("[EMAIL DEBUG] Registration error:", error.message);
-    next(error);
-  }
-});
-
-// VERIFY EMAIL
-router.post("/verify-email", sensitiveLimit, async (req, res, next) => {
-  try {
-    const { token } = req.body;
-
-    if (typeof token !== "string" || token.length !== 64) {
-      return res.status(400).json({
-        message: "Verification link is invalid.",
-      });
-    }
-
-    const user = await User.findOne({
-      verificationTokenHash: hashToken(token),
-      verificationExpires: { $gt: new Date() },
-    }).select("+verificationTokenHash +verificationExpires");
-
-    if (!user) {
-      return res.status(400).json({
-        message: "Verification link is invalid or expired.",
-      });
-    }
-
-    user.emailVerified = true;
-    user.verificationTokenHash = undefined;
-    user.verificationExpires = undefined;
-
-    await user.save();
-
-    res.json(sessionFor(user));
-  } catch (error) {
-    next(error);
-  }
-});
-
-// RESEND VERIFICATION EMAIL
-router.post("/resend-verification", sensitiveLimit, async (req, res, next) => {
-  try {
-    const { email } = req.body;
-
-    console.log("[EMAIL DEBUG] Resend request received.");
-
-    if (typeof email !== "string" || !emailPattern.test(email)) {
-      return res.status(400).json({
-        message: "Enter a valid email address.",
-      });
-    }
-
-    const user = await User.findOne({
-      email: email.trim().toLowerCase(),
-      emailVerified: false,
-    });
-
-    console.log(
-      "[EMAIL DEBUG] Unverified account found:",
-      Boolean(user)
-    );
-
-    const message =
-      "If the account needs verification, a new link will be sent.";
-
-    if (!user) {
-      console.log("[EMAIL DEBUG] No matching unverified account.");
-      return res.json({ message });
-    }
-
-    const token = randomBytes(32).toString("hex");
-
-    user.verificationTokenHash = hashToken(token);
-    user.verificationExpires = new Date(
-      Date.now() + 24 * 60 * 60 * 1000
-    );
-
-    await user.save();
-
-    console.log("[EMAIL DEBUG] Calling Resend email service.");
-
-    const sent = await sendAccountEmail(
-      user.email,
-      "Verify your CareerConnect account",
-      `Verify your account: ${clientOrigin()}/verify-email?token=${token}`
-    );
-
-    console.log("[EMAIL DEBUG] Email service result:", sent);
-
-    res.json({ message });
-  } catch (error) {
-    console.error(
-      "[EMAIL DEBUG] Resend verification route error:",
-      error.message
-    );
-
     next(error);
   }
 });
 
 // LOGIN
-router.post("/login", sensitiveLimit, async (req, res, next) => {
+router.post("/login", sensitiveLimit, requireTurnstile("login"), async (req, res, next) => {
   try {
     const { email, password } = req.body;
 
@@ -295,12 +165,6 @@ router.post("/login", sensitiveLimit, async (req, res, next) => {
     if (!user.accountActive) {
       return res.status(403).json({
         message: "This account is currently deactivated.",
-      });
-    }
-
-    if (!user.emailVerified) {
-      return res.status(403).json({
-        message: "Verify your email address before signing in.",
       });
     }
 
