@@ -405,8 +405,21 @@ function AuthPage({ register = false }) {
           <button className="button button-dark button-full auth-submit" disabled={busy || verificationPending}>{busy ? "One moment…" : verificationPending ? "Account created" : register ? "Create your account" : "Log in"} <ArrowRight size={16} /></button>
           <div className="auth-privacy"><ShieldCheck size={15} />Your information stays private and secure.</div>
         </form>
-        {!register && <Link className="auth-forgot-link" to="/forgot-password">Forgot your password?</Link>}
-        <div className="auth-switch">{register ? "Already have an account?" : "New to CareerConnect?"} <Link to={register ? "/login" : "/register"}>{register ? "Log in" : "Create an account"}</Link></div>
+        
+        {!register && (
+          <>
+            <ResendVerification />
+            <Link className="auth-forgot-link" to="/forgot-password">
+              Forgot your password?
+            </Link>
+          </>
+        )}
+        <div className="auth-switch">
+          {register ? "Already have an account?" : "New to CareerConnect?"}{" "}
+          <Link to={register ? "/login" : "/register"}>
+            {register ? "Log in" : "Create an account"}
+          </Link>
+        </div>
       </div></div>
     </section>
   );

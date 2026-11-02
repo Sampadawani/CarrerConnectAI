@@ -1,38 +1,34 @@
+import nodemailer from "nodemailer";
 
 export async function sendAccountEmail(to, subject, text) {
-  const apiKey = process.env.RESEND_API_KEY;
+  const gmailUser = process.env.GMAIL_USER;
+  const gmailAppPassword = process.env.GMAIL_APP_PASSWORD;
 
-  if (!apiKey) {
-    console.error("RESEND_API_KEY is missing.");
+  if (!gmailUser || !gmailAppPassword) {
+    console.error("GMAIL_USER or GMAIL_APP_PASSWORD is missing.");
     return false;
   }
 
   try {
-    const response = await fetch("https://api.resend.com/emails", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        "Content-Type": "application/json",
+    const transporter = nodemailer.createTransport({
+      service: "gmail",
+      auth: {
+        user: gmailUser,
+        pass: gmailAppPassword,
       },
-      body: JSON.stringify({
-        from: "CareerConnect AI <onboarding@resend.dev>",
-        to: [to],
-        subject,
-        text,
-      }),
     });
 
-    const result = await response.json();
+    await transporter.sendMail({
+      from: `"CareerConnect AI" <${gmailUser}>`,
+      to,
+      subject,
+      text,
+    });
 
-    if (!response.ok) {
-      console.error("Resend email error:", result);
-      return false;
-    }
-
-    console.log("Email sent successfully. Resend ID:", result.id);
+    console.log("Email sent successfully to:", to);
     return true;
   } catch (error) {
-    console.error("Email sending failed:", error.message);
+    console.error("Gmail email sending failed:", error.message);
     return false;
   }
 }
