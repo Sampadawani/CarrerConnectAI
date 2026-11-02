@@ -1,15 +1,38 @@
-import nodemailer from "nodemailer";
 
 export async function sendAccountEmail(to, subject, text) {
-  if (!process.env.SMTP_HOST || !process.env.SMTP_USER || !process.env.SMTP_PASS || !process.env.EMAIL_FROM) {
+  const apiKey = process.env.RESEND_API_KEY;
+
+  if (!apiKey) {
+    console.error("RESEND_API_KEY is missing.");
     return false;
   }
-  const transporter = nodemailer.createTransport({
-    host: process.env.SMTP_HOST,
-    port: Number(process.env.SMTP_PORT) || 587,
-    secure: process.env.SMTP_SECURE === "true",
-    auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS },
-  });
-  await transporter.sendMail({ from: process.env.EMAIL_FROM, to, subject, text });
-  return true;
+
+  try {
+    const response = await fetch("https://api.resend.com/emails", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        from: "CareerConnect AI <onboarding@resend.dev>",
+        to: [to],
+        subject,
+        text,
+      }),
+    });
+
+    const result = await response.json();
+
+    if (!response.ok) {
+      console.error("Resend email error:", result);
+      return false;
+    }
+
+    console.log("Email sent successfully. Resend ID:", result.id);
+    return true;
+  } catch (error) {
+    console.error("Email sending failed:", error.message);
+    return false;
+  }
 }
